@@ -28,7 +28,16 @@ export async function GET(request: NextRequest) {
     const allNFTs = await contract.getAllNFTs();
     
     // Convert the contract data to a more usable format
-    const nfts = allNFTs.map((nft: any) => ({
+    const nfts = allNFTs.map((nft: {
+      tokenId: bigint;
+      owner: string;
+      ipfsHash: string;
+      prompt: string;
+      price: bigint;
+      isForSale: boolean;
+      creator: string;
+      createdAt: bigint;
+    }) => ({
       tokenId: Number(nft.tokenId),
       owner: nft.owner,
       ipfsHash: nft.ipfsHash,

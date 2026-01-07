@@ -10,7 +10,21 @@ interface ProfileArtTokenCardProps {
 }
 
 function ProfileArtTokenCard({ token }: ProfileArtTokenCardProps) {
-  const [parameters, setParameters] = useState<any>(null);
+  const [parameters, setParameters] = useState<{
+    tokenId: number;
+    seed: string;
+    parameters: {
+      promptIndex: number;
+      styleIndex: number;
+      samplerIndex: number;
+      aspectIndex: number;
+      steps: number;
+      cfg: number;
+      latentSeed: number;
+      paletteId: number;
+    };
+    loaded: boolean;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const loadParameters = async () => {
@@ -21,7 +35,21 @@ function ProfileArtTokenCard({ token }: ProfileArtTokenCardProps) {
     try {
       // This would need to be implemented similar to dashboard
       // For now, we'll just show the token ID
-      setParameters({ loaded: true });
+      setParameters({
+        tokenId: token.tokenId,
+        seed: '',
+        parameters: {
+          promptIndex: 0,
+          styleIndex: 0,
+          samplerIndex: 0,
+          aspectIndex: 0,
+          steps: 0,
+          cfg: 0,
+          latentSeed: 0,
+          paletteId: 0
+        },
+        loaded: true
+      });
     } catch (err) {
       console.error('Failed to load parameters');
     } finally {

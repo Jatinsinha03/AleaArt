@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to read image file' }, { status: 500 });
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Manual update error:', error);
     return NextResponse.json(
       { error: 'Failed to update image data' },
