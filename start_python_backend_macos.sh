@@ -49,5 +49,5 @@ echo ""
 echo "Using macOS-compatible backend (runwayml/stable-diffusion-v1-5)"
 echo "Press Ctrl+C to stop the server"
 
-python python_backend_macos.py
+PORT=5001 python python_backend_macos.py
 

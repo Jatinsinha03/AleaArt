@@ -14,16 +14,16 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
     
-    // Connect to MongoDB directly to access the generatedImages collection
+    // Connect to MongoDB directly to access the userImages collection
     const client = new MongoClient(process.env.MONGODB_URI!);
     await client.connect();
     const db = client.db('aleart');
-    
-    // Get all completed images for the user from the generatedImages collection
-    const completedImages = await db.collection('generatedImages')
-      .find({ 
+
+    // Get all completed images for the user from the userImages collection
+    const completedImages = await db.collection('userImages')
+      .find({
         userId: session.user.id,
-        status: 'completed' 
+        status: 'completed'
       })
       .sort({ createdAt: -1 }) // Sort by newest first
       .toArray();

@@ -17,6 +17,7 @@ interface NFTData {
   createdAt: number;
 }
 
+/*
 interface SpotlightData {
   tokenId: number;
   owner: string;
@@ -32,6 +33,7 @@ interface SpotlightData {
   spotlightEndTime: number;
   timeRemaining: number;
 }
+*/
 
 export default function Marketplace() {
   const { data: session, status } = useSession();
@@ -43,10 +45,12 @@ export default function Marketplace() {
   const [userAddress, setUserAddress] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(8);
+  /*
   const [spotlight, setSpotlight] = useState<SpotlightData | null>(null);
   const [loadingSpotlight, setLoadingSpotlight] = useState(true);
   const [requestingSpotlight, setRequestingSpotlight] = useState(false);
   const [canRequestSpotlight, setCanRequestSpotlight] = useState(false);
+  */
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -59,10 +63,12 @@ export default function Marketplace() {
     checkWalletConnection();
   }, [session, status, router]);
 
+  /*
   // Fetch spotlight when wallet connection changes
   useEffect(() => {
     fetchSpotlight();
   }, [walletConnected, userAddress]);
+  */
 
   const checkWalletConnection = async () => {
     if (typeof window.ethereum !== 'undefined') {
@@ -88,10 +94,10 @@ export default function Marketplace() {
       // Request account access
       await window.ethereum.request({ method: 'eth_requestAccounts' });
       
-      // Switch to Arbitrum Sepolia network
+      // Switch to Mantle Testnet
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x66eee' }], // Arbitrum Sepolia chain ID
+        params: [{ chainId: '0x1389' }], // Mantle Testnet chain ID
       });
       
       const provider = new BrowserProvider(window.ethereum);
@@ -101,7 +107,7 @@ export default function Marketplace() {
       setWalletConnected(true);
     } catch (error) {
       console.error('Error connecting wallet:', error);
-      alert('Failed to connect wallet. Please make sure you\'re on Arbitrum Sepolia network.');
+      alert('Failed to connect wallet. Please make sure you\'re on Mantle Testnet.');
     }
   };
 
@@ -121,6 +127,7 @@ export default function Marketplace() {
     }
   };
 
+  /*
   const fetchSpotlight = async () => {
     try {
       setLoadingSpotlight(true);
@@ -199,6 +206,7 @@ export default function Marketplace() {
       setRequestingSpotlight(false);
     }
   };
+  */
 
   const buyNFT = async (nft: NFTData) => {
     if (!walletConnected) {
@@ -244,7 +252,7 @@ export default function Marketplace() {
         // Refresh the list after a delay to allow for processing
         setTimeout(() => {
           fetchNFTs();
-          fetchSpotlight();
+          // fetchSpotlight();
         }, 5000);
       } else {
         alert(`Failed to buy NFT: ${data.error}`);
@@ -296,6 +304,7 @@ export default function Marketplace() {
         </div>
 
         {/* Spotlight Section */}
+        {/* 
         <div className="mb-20">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-3xl font-semibold text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600 }}>Spotlight</h2>
@@ -399,6 +408,7 @@ export default function Marketplace() {
             </div>
           )}
         </div>
+        */}
 
         {/* NFT Grid */}
         {nfts.length === 0 ? (

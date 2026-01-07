@@ -144,7 +144,7 @@ export default async function LandingPage() {
                 Random Art Generation
               </h3>
               <p className="text-base text-gray-300 max-w-sm" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400 }}>
-                Generate unique art parameters using Pyth Entropy V2 for verifiable blockchain randomness.
+                Generate unique art parameters using commit-reveal mechanism on Mantle Testnet for verifiable blockchain randomness.
               </p>
               {/* Right border line */}
               <div className="absolute right-0 top-0 bottom-0 w-px bg-white"></div>
@@ -156,7 +156,7 @@ export default async function LandingPage() {
                 NFT Minting
               </h3>
               <p className="text-base text-gray-300 max-w-sm" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400 }}>
-                Convert your generated art into tradeable NFTs on Arbitrum Sepolia blockchain.
+                Convert your generated art into tradeable NFTs on Mantle Testnet blockchain.
               </p>
               {/* Right border line */}
               <div className="absolute right-0 top-0 bottom-0 w-px bg-white"></div>
@@ -216,7 +216,7 @@ export default async function LandingPage() {
                     Seamless blockchain integration
                   </h3>
                   <p className="text-lg text-gray-600 leading-relaxed" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400 }}>
-                    Our platform integrates seamlessly with Arbitrum Sepolia, providing fast and cost-effective 
+                    Our platform integrates seamlessly with Mantle Testnet, providing fast and cost-effective 
                     blockchain interactions for art generation and NFT trading.
                   </p>
                 </div>
@@ -275,7 +275,7 @@ export default async function LandingPage() {
             <h2 className="text-3xl font-bold mb-4" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 800 }}>Create with us</h2>
             <p className="text-gray-400 mb-6" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400 }}>
               Generate unique art parameters and mint NFTs with blockchain-powered randomness 
-              on Arbitrum Sepolia.
+              on Mantle Testnet.
             </p>
             <Link 
               href="/signup"

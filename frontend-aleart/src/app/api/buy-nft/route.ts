@@ -3,8 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { ethers } from 'ethers';
 
-const NFT_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_NFT_CONTRACT_ADDRESS || '0x806019F8a33A01a4A3fea93320601cC77B6Dcb79';
-const ARBITRUM_SEPOLIA_RPC = 'https://arbitrum-sepolia-rpc.publicnode.com';
+const NFT_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_NFT_CONTRACT_ADDRESS || '';
+const ARBITRUM_SEPOLIA_RPC = 'https://rpc.sepolia.mantle.xyz';
 
 // NFT Contract ABI
 const NFT_CONTRACT_ABI = [
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Connect to Arbitrum Sepolia (read-only provider)
+    // Connect to Mantle Testnet (read-only provider)
     const provider = new ethers.JsonRpcProvider(ARBITRUM_SEPOLIA_RPC);
     const contract = new ethers.Contract(NFT_CONTRACT_ADDRESS, NFT_CONTRACT_ABI, provider);
     

@@ -18,7 +18,7 @@ const config: HardhatUserConfig = {
     },
     localhost: {
       url: "http://127.0.0.1:8545",
-      accounts: ["0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"],
+      accounts: [""],
     },
     sepolia: {
       type: "http",
@@ -32,6 +32,13 @@ const config: HardhatUserConfig = {
       url: "https://sepolia-rollup.arbitrum.io/rpc",
       accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
       chainId: 421614,
+    },
+    mantleTestnet: {
+      type: "http",
+      chainType: "l1",
+      url: "https://rpc.testnet.mantle.xyz",
+      accounts: [configVariable("MANTLE_PRIVATE_KEY")],
+      chainId: 5001,
     },
   },
 };

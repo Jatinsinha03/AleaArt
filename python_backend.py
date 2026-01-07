@@ -13,6 +13,10 @@ import uuid
 from PIL import Image
 import io
 import base64
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -202,4 +206,6 @@ if __name__ == '__main__':
             print(f"Warning: Could not install {package}")
     
     print("Starting Flask server...")
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    port = int(os.getenv('PORT', 8000))
+    print(f"🔗 Server will run on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=True)

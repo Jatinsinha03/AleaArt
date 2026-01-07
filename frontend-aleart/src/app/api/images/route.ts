@@ -25,13 +25,13 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
     
-    // Connect to MongoDB directly to access the generatedImages collection
+    // Connect to MongoDB directly to access the userImages collection
     const client = new MongoClient(process.env.MONGODB_URI!);
     await client.connect();
     const db = client.db('aleart');
-    
-    const imageEntry = await db.collection('generatedImages')
-      .findOne({ 
+
+    const imageEntry = await db.collection('userImages')
+      .findOne({
         userId: session.user.id,
         tokenId: parseInt(tokenId)
       });

@@ -6,24 +6,28 @@ Generates images using Stable Diffusion with art parameters from blockchain
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-import torch
-from diffusers import StableDiffusionPipeline
+# import torch
+# from diffusers import StableDiffusionPipeline
 import os
 import uuid
-from PIL import Image
+# from PIL import Image
 import io
 import base64
 import pymongo
 from datetime import datetime
 import requests
 import json
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Global variables for the model
-pipe = None
-model_id = "runwayml/stable-diffusion-v1-5"
+# Global variables for the model - COMMENTED OUT FOR CLIPDROP API VERSION
+# pipe = None
+# model_id = "runwayml/stable-diffusion-v1-5"
 
 # MongoDB connection (for metadata only)
 mongo_client = None
@@ -102,42 +106,43 @@ def upload_to_pinata(image_data, filename, metadata=None):
         print(f"❌ Error uploading to Pinata: {e}")
         return None
 
-def load_model():
-    """Load the Stable Diffusion model"""
-    global pipe
-    if pipe is None:
-        print("Loading Stable Diffusion model...")
-        
-        # Use a simpler loading approach
-        pipe = StableDiffusionPipeline.from_pretrained(
-            model_id, 
-            torch_dtype=torch.float32,
-            safety_checker=None,
-            requires_safety_checker=False,
-            use_safetensors=True
-        )
-        
-        # Move to CPU first, then to GPU if available
-        pipe = pipe.to("cpu")
-        print("Model loaded on CPU")
-        
-        # Try to move to GPU if available
-        if torch.cuda.is_available():
-            try:
-                pipe = pipe.to("cuda")
-                print("Model moved to GPU")
-            except Exception as e:
-                print(f"Could not move to GPU: {e}")
-                print("Staying on CPU")
-        
-        # Enable memory efficient attention
-        try:
-            pipe.enable_attention_slicing()
-            print("Memory efficient attention enabled")
-        except Exception as e:
-            print(f"Could not enable attention slicing: {e}")
-        
-        print("Model loaded successfully!")
+# COMMENTED OUT FOR CLIPDROP API VERSION
+# def load_model():
+#     """Load the Stable Diffusion model"""
+#     global pipe
+#     if pipe is None:
+#         print("Loading Stable Diffusion model...")
+#
+#         # Use a simpler loading approach
+#         pipe = StableDiffusionPipeline.from_pretrained(
+#             model_id,
+#             torch_dtype=torch.float32,
+#             safety_checker=None,
+#             requires_safety_checker=False,
+#             use_safetensors=True
+#         )
+#
+#         # Move to CPU first, then to GPU if available
+#         pipe = pipe.to("cpu")
+#         print("Model loaded on CPU")
+#
+#         # Try to move to GPU if available
+#         if torch.cuda.is_available():
+#             try:
+#                 pipe = pipe.to("cuda")
+#                 print("Model moved to GPU")
+#             except Exception as e:
+#                 print(f"Could not move to GPU: {e}")
+#                 print("Staying on CPU")
+#
+#         # Enable memory efficient attention
+#         try:
+#             pipe.enable_attention_slicing()
+#             print("Memory efficient attention enabled")
+#         except Exception as e:
+#             print(f"Could not enable attention slicing: {e}")
+#
+#         print("Model loaded successfully!")
 
 def save_image_metadata_to_mongodb(user_id, token_id, ipfs_hash, prompt, parameters):
     """Save image metadata to MongoDB (IPFS hash instead of base64 data)"""
@@ -189,30 +194,38 @@ def generate_image():
         print(f"Steps: {steps}, CFG: {cfg_scale}, Seed: {seed}")
         print(f"Size: {width}x{height}")
         
+        # COMMENTED OUT FOR CLIPDROP API VERSION
         # Check if model is loaded
-        if pipe is None:
-            print("Model not loaded, loading now...")
-            load_model()
+        # if pipe is None:
+        #     print("Model not loaded, loading now...")
+        #     load_model()
+
+        # Generate image using Stable Diffusion
+        # result = pipe(
+        #     prompt=prompt,
+        #     num_inference_steps=steps,
+        #     guidance_scale=cfg_scale,
+        #     width=width,
+        #     height=height,
+        #     generator=torch.Generator().manual_seed(seed) if seed else None
+        # )
+
+        # image = result.images[0]
+
+        # PLACEHOLDER: This backend now uses Clipdrop API instead of Stable Diffusion
+        return jsonify({
+            'success': False,
+            'error': 'This backend has been updated to use Clipdrop API. Please use python_backend_clipdrop.py instead.'
+        }), 501
         
-        # Generate image
-        result = pipe(
-            prompt=prompt,
-            num_inference_steps=steps,
-            guidance_scale=cfg_scale,
-            width=width,
-            height=height,
-            generator=torch.Generator().manual_seed(seed) if seed else None
-        )
-        
-        image = result.images[0]
-        
+        # COMMENTED OUT FOR CLIPDROP API VERSION
         # Prepare image data for IPFS upload
-        image_filename = f"art_token_{token_id}_{uuid.uuid4().hex[:8]}.png"
-        
+        # image_filename = f"art_token_{token_id}_{uuid.uuid4().hex[:8]}.png"
+
         # Convert image to bytes for IPFS upload
-        buffer = io.BytesIO()
-        image.save(buffer, format='PNG')
-        image_bytes = buffer.getvalue()
+        # buffer = io.BytesIO()
+        # image.save(buffer, format='PNG')
+        # image_bytes = buffer.getvalue()
         
         print(f"✅ Image generated successfully for token {token_id}")
         print(f"📏 Image size: {len(image_bytes)} bytes")
@@ -327,5 +340,7 @@ if __name__ == '__main__':
     print("Loading Stable Diffusion model at startup...")
     load_model()
     
+    port = int(os.getenv('PORT', 8000))
     print("Starting Flask server...")
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    print(f"🔗 Server will run on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=True)

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import connectDB from '@/lib/mongodb';
-import UserAleart from '@/models/UserAleart';
+import { MongoClient } from 'mongodb';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,21 +20,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await connectDB();
-    
-    const user = await UserAleart.findById(session.user.id);
-    
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
+    // Note: We don't need to fetch user data anymore since we're using direct MongoDB collections
 
     // Check if image already exists for this token
-    const existingImage = user.generatedImages.find((img: { tokenId: number; status: string }) => img.tokenId === tokenId);
-    if (existingImage && existingImage.status === 'completed') {
+    const checkClient = new MongoClient(process.env.MONGODB_URI!);
+    await checkClient.connect();
+    const checkDb = checkClient.db('aleart');
+
+    const existingImage = await checkDb.collection('userImages').findOne({
+      userId: session.user.id,
+      tokenId: tokenId,
+      status: 'completed'
+    });
+
+    await checkClient.close();
+
+    if (existingImage) {
       return NextResponse.json({
         success: true,
         message: 'Image already exists',
         imageData: existingImage.imageData,
+        ipfsHash: existingImage.ipfsHash,
+        ipfsUrl: existingImage.ipfsUrl,
         tokenId: tokenId
       });
     }
@@ -122,25 +128,23 @@ export async function POST(request: NextRequest) {
       userId: session.user.id  // Add user ID
     };
 
-    // Create a placeholder image entry with 'generating' status
-    const imageEntry = {
-      tokenId: artParams.tokenId,
-      // imageData will be added when generation completes
-      prompt: finalPrompt,
-      parameters: {
-        steps: artParams.steps,
-        cfg_scale: artParams.cfg,
-        seed: artParams.latentSeed,
-        width: pythonRequest.width,
-        height: pythonRequest.height,
-      },
-      status: 'generating' as const,
-      createdAt: new Date(),
-    };
+    // Note: Image entry is now created directly in MongoDB collection
 
-    // Add to user's generated images
-    user.generatedImages.push(imageEntry);
-    await user.save();
+    // Save to userImages collection (consistent with backend)
+    const saveClient = new MongoClient(process.env.MONGODB_URI!);
+    await saveClient.connect();
+    const saveDb = saveClient.db('aleart');
+
+    await saveDb.collection('userImages').insertOne({
+      userId: session.user.id,
+      tokenId: artParams.tokenId,
+      status: 'generating',
+      prompt: finalPrompt,
+      parameters: artParams,
+      createdAt: new Date()
+    });
+
+    await saveClient.close();
 
     // Start async image generation (don't await)
     generateImageAsync(session.user.id, tokenId, pythonRequest);
@@ -179,7 +183,7 @@ async function generateImageAsync(userId: string, tokenId: number, pythonRequest
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20 * 60 * 1000); // 20 minutes timeout
     
-    const pythonResponse = await fetch('http://localhost:8000/generate-image', {
+    const pythonResponse = await fetch('http://localhost:5001/generate-image', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -198,27 +202,26 @@ async function generateImageAsync(userId: string, tokenId: number, pythonRequest
     console.log(`Python backend response for token ${tokenId}:`, result.success ? 'Success' : 'Failed');
 
     if (result.success) {
-      // Update the image entry in MongoDB with IPFS data
-      await connectDB();
-      const user = await UserAleart.findById(userId);
-      
-      if (user) {
-        const imageEntry = user.generatedImages.find((img: { tokenId: number; status: string }) => img.tokenId === tokenId);
-        if (imageEntry) {
-          // Update with IPFS data instead of base64
-          imageEntry.ipfsHash = result.ipfsHash;
-          imageEntry.ipfsUrl = result.ipfsUrl;
-          imageEntry.imageData = result.imageBase64; // Keep base64 as fallback
-          imageEntry.status = 'completed';
-          await user.save();
-          console.log(`✅ Image generation completed and saved for token ${tokenId}`);
-          console.log(`🌐 IPFS URL: ${result.ipfsUrl}`);
-        } else {
-          console.log(`❌ Image entry not found for token ${tokenId}`);
+      // Update the image entry in userImages collection
+      const client = new MongoClient(process.env.MONGODB_URI!);
+      await client.connect();
+      const db = client.db('aleart');
+
+      await db.collection('userImages').updateOne(
+        { userId: userId, tokenId: tokenId },
+        {
+          $set: {
+            ipfsHash: result.ipfsHash,
+            ipfsUrl: result.ipfsUrl,
+            imageData: result.imageBase64, // Keep base64 as fallback
+            status: 'completed'
+          }
         }
-      } else {
-        console.log(`❌ User not found for ID ${userId}`);
-      }
+      );
+
+      await client.close();
+      console.log(`✅ Image generation completed and saved for token ${tokenId}`);
+      console.log(`🌐 IPFS URL: ${result.ipfsUrl}`);
     } else {
       throw new Error(result.error || 'Image generation failed');
     }
@@ -227,17 +230,17 @@ async function generateImageAsync(userId: string, tokenId: number, pythonRequest
     
     // Update status to failed
     try {
-      await connectDB();
-      const user = await UserAleart.findById(userId);
-      
-      if (user) {
-        const imageEntry = user.generatedImages.find((img: { tokenId: number; status: string }) => img.tokenId === tokenId);
-        if (imageEntry) {
-          imageEntry.status = 'failed';
-          await user.save();
-          console.log(`📝 Updated status to failed for token ${tokenId}`);
-        }
-      }
+      const client = new MongoClient(process.env.MONGODB_URI!);
+      await client.connect();
+      const db = client.db('aleart');
+
+      await db.collection('userImages').updateOne(
+        { userId: userId, tokenId: tokenId },
+        { $set: { status: 'failed' } }
+      );
+
+      await client.close();
+      console.log(`📝 Updated status to failed for token ${tokenId}`);
     } catch (dbError) {
       console.error('❌ Failed to update image status:', dbError);
     }

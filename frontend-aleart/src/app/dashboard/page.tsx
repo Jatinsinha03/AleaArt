@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { BrowserProvider, Contract, parseEther, ethers } from 'ethers';
+import { BrowserProvider, Contract, ethers } from 'ethers';
 import { ArtToken } from '@/types';
 import Navbar from '@/components/Navbar';
 
@@ -99,7 +99,7 @@ function ArtTokenCard({ token, fetchTokenParameters }: ArtTokenCardProps) {
       
       if (result.success) {
         // Show success message
-        alert('Image generation started! Your art will be ready in a few minutes. You can check the status by refreshing the page.');
+        alert('Image generation started! Your art will be ready in a few seconds. You can check the status by refreshing the page.');
         
         // Start polling for status updates
         pollImageStatus();
@@ -212,7 +212,7 @@ function ArtTokenCard({ token, fetchTokenParameters }: ArtTokenCardProps) {
               className="border border-yellow-400 text-yellow-400 px-6 py-2 rounded-lg hover:bg-yellow-400 hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}
             >
-              {generatingImage ? 'Generating... (2-3 min)' : 'Generate Image'}
+              {generatingImage ? 'Generating... (10-15 sec)' : 'Generate Image'}
             </button>
           </div>
           
@@ -260,12 +260,14 @@ export default function DashboardPage() {
 
   const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x420D121aE08007Ef0A66E67D5D7BfFdC98AbECF0';
   const CONTRACT_ABI = [
-    "function requestArtParams() external payable returns (uint256 tokenId, uint64 requestId)",
+    "function commit(bytes32 hash) external",
+    "function reveal(uint256 secret) external returns (uint256 tokenId)",
     "function viewRenderParams(uint256 tokenId) external view returns (tuple(uint8 promptIndex, uint8 styleIndex, uint8 samplerIndex, uint8 aspectIndex, uint16 steps, uint16 cfg, uint32 latentSeed, uint16 paletteId))",
     "function tokenSeed(uint256 tokenId) external view returns (bytes32)",
     "function nextTokenId() external view returns (uint256)",
-    "event EntropyRequested(uint256 indexed tokenId, uint64 indexed requestId, uint256 feePaid)",
-    "event EntropyFulfilled(uint256 indexed tokenId, bytes32 seed)"
+    "function commits(address user) external view returns (bytes32 hash, uint256 blockNumber, bool revealed)",
+    "event Committed(address indexed user)",
+    "event Revealed(address indexed user, uint256 tokenId, bytes32 seed)"
   ];
 
   useEffect(() => {
@@ -459,26 +461,26 @@ export default function DashboardPage() {
       // Request account access
       await window.ethereum.request({ method: 'eth_requestAccounts' });
       
-      // Switch to Arbitrum Sepolia network
+      // Switch to Mantle Testnet
       try {
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x66eee' }], // Arbitrum Sepolia chain ID
+          params: [{ chainId: '0x1389' }], // Mantle Testnet chain ID
         });
       } catch {
         // If the network doesn't exist, add it
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',
           params: [{
-            chainId: '0x66eee',
-            chainName: 'Arbitrum Sepolia',
-            rpcUrls: ['https://arbitrum-sepolia-rpc.publicnode.com'],
+            chainId: '0x1389',
+            chainName: 'Mantle Testnet',
+            rpcUrls: ['https://rpc.testnet.mantle.xyz'],
             nativeCurrency: {
-              name: 'ETH',
-              symbol: 'ETH',
+              name: 'MNT',
+              symbol: 'MNT',
               decimals: 18,
             },
-            blockExplorerUrls: ['https://sepolia.arbiscan.io/'],
+            blockExplorerUrls: ['https://explorer.testnet.mantle.xyz/'],
           }],
         });
       }
@@ -521,80 +523,113 @@ export default function DashboardPage() {
 
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
       const provider = new BrowserProvider(window.ethereum!);
       const signer = await provider.getSigner();
       const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
-      const totalValue = parseEther("0.001");
-      const tx = await contract.requestArtParams({ value: totalValue });
-      
-      setSuccess(`Transaction sent: ${tx.hash}`);
-      
-      const receipt = await tx.wait();
-      const event = receipt.logs.find((log: ethers.Log) => {
-        try {
-          const parsed = contract.interface.parseLog(log);
-          return parsed?.name === 'EntropyRequested';
-        } catch {
-          return false;
+      // Check if there is an existing commit
+      const commitData = await contract.commits(walletAddress);
+      const hasExistingCommit = commitData.hash !== '0x0000000000000000000000000000000000000000000000000000000000000000';
+
+      if (!hasExistingCommit) {
+        // Step 1: Commit
+        const secretBytes = ethers.randomBytes(32);
+        const secret = BigInt(ethers.hexlify(secretBytes));
+        
+        // Store secret in localStorage to survive refreshes
+        localStorage.setItem(`alea_art_secret_${walletAddress}`, secret.toString());
+        
+        const hash = ethers.solidityPackedKeccak256(["uint256"], [secret]);
+        
+        setSuccess('Initiating commit transaction...');
+        const tx = await contract.commit(hash);
+        setSuccess(`Commit transaction sent: ${tx.hash}. Waiting for confirmation...`);
+        
+        await tx.wait();
+        setSuccess('Commit confirmed! Now waiting for one block before reveal...');
+        
+        await handleReveal(contract, secret);
+      } else {
+        // Step 2: Reveal (if already committed)
+        const savedSecret = localStorage.getItem(`alea_art_secret_${walletAddress}`);
+        if (!savedSecret) {
+          setError('A commit exists for this address but the secret was not found in your browser. You may need to wait 256 blocks or use a different account.');
+          setLoading(false);
+          return;
         }
-      });
-      
-      if (event) {
-        const parsed = contract.interface.parseLog(event);
-        const tokenId = parsed?.args.tokenId.toString();
-        // const requestId = parsed?.args.requestId.toString();
-        
-        setSuccess(`Art parameters requested! Token ID: ${tokenId}`);
-        
-        // Poll for completion
-        pollForArtParams(tokenId);
+        await handleReveal(contract, BigInt(savedSecret));
       }
     } catch (error: unknown) {
-      setError(`Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(error);
+      setError(`Process failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const pollForArtParams = async (tokenId: string) => {
-    const maxAttempts = 30;
-    let attempts = 0;
-
-    const poll = async () => {
-      try {
-        // const provider = new BrowserProvider(window.ethereum);
-        // const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-        
-        // const params = await contract.viewRenderParams(tokenId);
-        // const seed = await contract.tokenSeed(tokenId);
-        
-        // Save only token ID to database
-        await fetch('/api/art-tokens', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tokenId: parseInt(tokenId),
-            requestId: tokenId,
-          }),
-        });
-
-        setSuccess(`Art parameters generated for Token #${tokenId}!`);
-        fetchArtTokens(); // Refresh the list
-        return;
-      } catch {
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 2000); // Poll every 2 seconds
-        } else {
-          setError('Art parameters generation timed out');
-        }
+  const handleReveal = async (contract: Contract, secret: bigint) => {
+    try {
+      // Get the commit block number
+      const commitData = await contract.commits(walletAddress);
+      const commitBlock = Number(commitData.blockNumber);
+      
+      const provider = new BrowserProvider(window.ethereum!);
+      
+      // Wait for at least one block to pass (since contract uses blockhash(c.blockNumber + 1))
+      setSuccess('Waiting for the next block to be mined...');
+      let currentBlock = await provider.getBlockNumber();
+      while (currentBlock <= commitBlock) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        currentBlock = await provider.getBlockNumber();
       }
-    };
 
-    poll();
+      setSuccess('Revealing art parameters...');
+      const revealTx = await contract.reveal(secret);
+      setSuccess(`Reveal transaction sent: ${revealTx.hash}. Finalizing...`);
+      
+      const receipt = await revealTx.wait();
+      const event = receipt.logs.find((log: ethers.Log) => {
+        try {
+          const parsed = contract.interface.parseLog(log);
+          return parsed?.name === 'Revealed';
+        } catch { return false; }
+      });
+      
+      if (event) {
+        const parsed = contract.interface.parseLog(event);
+        const tokenId = parsed?.args.tokenId.toString();
+        
+        // Success! Clear the secret
+        localStorage.removeItem(`alea_art_secret_${walletAddress}`);
+        
+        setSuccess(`Art parameters generated for Token #${tokenId}!`);
+        
+        // Save to database
+        await saveTokenToDb(tokenId);
+      }
+    } catch (error: unknown) {
+      console.error(error);
+      setError(`Reveal failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const saveTokenToDb = async (tokenId: string) => {
+    try {
+      await fetch('/api/art-tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokenId: parseInt(tokenId),
+          requestId: `reveal_${tokenId}_${Date.now()}`,
+        }),
+      });
+      fetchArtTokens(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to save token to database:', error);
+    }
   };
 
 
@@ -677,7 +712,7 @@ export default function DashboardPage() {
               {loading ? 'Generating...' : 'Request Art Parameters'}
             </button>
             <p className="text-gray-300 text-lg mt-4" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>
-              Estimated cost: ~0.0004 ETH + gas
+              Estimated cost: ~0.01 MNT
             </p>
           </div>
         </div>
@@ -737,7 +772,7 @@ export default function DashboardPage() {
                       <div className="space-y-3">
                         <div>
                           <label className="block text-white text-sm mb-2" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>
-                            Price in ETH (0 for not for sale):
+                            Price in MNT (0 for not for sale):
                           </label>
                           <input
                             type="number"

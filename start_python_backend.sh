@@ -34,11 +34,29 @@ if [ $? -ne 0 ]; then
     pip install torch diffusers transformers scipy flask flask-cors pillow accelerate
 fi
 
+# Check for .env file
+if [ ! -f ".env" ]; then
+    echo "📄 Creating .env file from env.example..."
+    if [ -f "env.example" ]; then
+        cp env.example .env
+        echo "✅ Created .env file. Please edit it with your actual values:"
+        echo "   nano .env"
+        echo ""
+    else
+        echo "❌ env.example file not found. Please create a .env file manually."
+        exit 1
+    fi
+fi
+
+# Load environment variables from .env file
+echo "🔍 Loading environment variables from .env file..."
+export $(grep -v '^#' .env | xargs)
+
 # Create generated_images directory
 mkdir -p generated_images
 
 # Start the Flask server
-echo "🚀 Starting Flask server on http://localhost:8000"
+echo "🚀 Starting Flask server on http://localhost:5001"
 echo "📋 Available endpoints:"
 echo "   - POST /generate-image - Generate image from art parameters"
 echo "   - GET /health - Health check"
@@ -46,4 +64,4 @@ echo "   - GET /generated_images/<filename> - Serve generated images"
 echo ""
 echo "Press Ctrl+C to stop the server"
 
-python python_backend.py
+PORT=5001 python python_backend.py

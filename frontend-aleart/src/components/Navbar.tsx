@@ -55,7 +55,7 @@ export default function Navbar() {
       setWalletConnected(true);
     } catch (error) {
       console.error('Error connecting wallet:', error);
-      alert('Failed to connect wallet. Please make sure you\'re on Arbitrum Sepolia network.');
+      alert('Failed to connect wallet. Please make sure you\'re on Mantle Testnet.');
     }
   };
 
